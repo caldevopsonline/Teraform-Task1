@@ -34,17 +34,20 @@ resource "aws_lambda_function" "nefos-lambda" {
   runtime       = "python3.8"
 }
 
+#Create Api Gateway
 resource "aws_apigatewayv2_api" "nefos-api" {
-  name          = "v2-hhtp-api"
+  name          = "nefos-http-api"
   protocol_type = "HTTP"
 }
 
+#Setup Api gateway stage
 resource "aws_apigatewayv2_stage" "nefos-lambad-stage" {
   api_id      = aws_apigatewayv2_api.nefos-api.id
-  name        = "default"
+  name        = "api"
   auto_deploy = true
 }
 
+#Integrate api gateway with lambda function
 resource "aws_apigatewayv2_integration" "nefos-lambda-integration" {
   api_id               = aws_apigatewayv2_api.nefos-api.id
   integration_type     = "AWS_PROXY"
@@ -52,25 +55,19 @@ resource "aws_apigatewayv2_integration" "nefos-lambda-integration" {
   integration_uri      = aws_lambda_function.nefos-lambda.invoke_arn
   passthrough_behavior = "WHEN_NO_MATCH"
 }
+#Set ApiGateway route
 resource "aws_apigatewayv2_route" "nefos-lambda-route" {
   api_id    = aws_apigatewayv2_api.nefos-api.id
   route_key = "GET /{proxy+}"
   target    = "integrations/${aws_apigatewayv2_integration.nefos-lambda-integration.id}"
 }
 
-resource "aws_lambda_permission" "api-gw" {
+#Implement Apigateway Permissions to invoke lambda function
+resource "aws_lambda_permission" "nefos-api-gateway-permission" {
   statement_id  = "AllowExecutionFromApiGateway"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.nefos-lambda.arn
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.nefos-api.execution_arn}/*/*/*"
 
-}
-
-resource "aws_instance" "us-east-1" {
-  ami           = "ami-0c2b8ca1dad447f8a"
-  instance_type = "t3.micro"
-  tags = {
-    Name = "aws-instance-testing-terraform"
-  }
 }
