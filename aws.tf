@@ -1,8 +1,8 @@
 #setup provider variables
 provider "aws" {
   region     = "us-east-1"
-  access_key = "AKIAXGGSM5QTZ3RWMGLX"
-  secret_key = "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"
+  access_key = ""
+  secret_key = ""
 }
 #Create Iam role which will be used for the lambda function
 resource "aws_iam_role" "iam_for_nefos" {
