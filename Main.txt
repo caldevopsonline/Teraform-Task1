@@ -1,0 +1,73 @@
+#setup provider variables
+provider "aws" {
+  region     = "us-east-1"
+  access_key = "AKIAXGGSM5QTQHLDISW6"
+  secret_key = "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"
+}
+
+variable "myregion" {
+  default = "us-east-1"
+}
+
+variable "accountId" {
+  default = "494362487847"
+}
+
+# API Gateway
+resource "aws_api_gateway_rest_api" "calebapi" {
+  name = "calebapi"
+}
+
+resource "aws_api_gateway_resource" "resource" {
+  path_part   = "resource"
+  parent_id   = aws_api_gateway_rest_api.calebapi.root_resource_id
+  rest_api_id = aws_api_gateway_rest_api.calebapi.id
+}
+
+resource "aws_api_gateway_method" "method" {
+  rest_api_id   = aws_api_gateway_rest_api.calebapi.id
+  resource_id   = aws_api_gateway_resource.resource.id
+  http_method   = "GET"
+  authorization = "NONE"
+  api_key_required = true
+}
+
+resource "aws_api_gateway_integration" "integration" {
+  rest_api_id             = aws_api_gateway_rest_api.calebapi.id
+  resource_id             = aws_api_gateway_resource.resource.id
+  http_method             = aws_api_gateway_method.method.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.caleblambda.invoke_arn
+
+}
+
+# Lambda
+resource "aws_lambda_permission" "apigw_lambda" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.caleblambda.function_name
+  principal     = "apigateway.amazonaws.com"
+
+  # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
+  source_arn = "arn:aws:execute-api:${var.myregion}:${var.accountId}:${aws_api_gateway_rest_api.calebapi.id}/*/${aws_api_gateway_method.method.http_method}${aws_api_gateway_resource.resource.path}"
+}
+
+resource "aws_lambda_function" "caleblambda" {
+  filename      = "nefos_lambda_function.zip"
+  function_name = "caleblambda"
+  role          = aws_iam_role.calebrole.arn
+  handler       = "lambda.lambda_handler"
+  runtime       = "python3.8"
+
+  # The filebase64sha256() function is available in Terraform 0.11.12 and later
+  # For Terraform 0.11.11 and earlier, use the base64sha256() function and the file() function:
+  # source_code_hash = "${base64sha256(file("lambda.zip"))}"
+  source_code_hash = filebase64sha256("nefos_lambda_function.zip")
+}
+
+# IAM
+resource "aws_iam_role" "calebrole" {
+  name               = "calebrole"
+  assume_role_policy = file("iam_assume_policy.json")
+}
